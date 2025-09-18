@@ -26,6 +26,8 @@ yarn create next-app your-project-name --typescript
 yarn
 ```
 
+## WebStorm의 yarn 설정
+Preferences > Languages & Frameworks > Node.js에서 Package Manager 항목을 yarn으로 변경.
 
 ## CSS 세팅
 - 프로젝트 세팅 시 tailwind css 설치를 선택하면 자동으로 세팅된다.
@@ -40,3 +42,39 @@ yarn
 ```global.css
 @import "tailwindcss";
 ```
+
+## shadcn 사용 시
+```
+yarn add -D shadcn-ui
+```
+
+
+
+## vercel 세팅
+- [vercel](https://vercel.com/)에서 프로젝트 생성 후 gitHub repository만 연결하면 자동 배포 실행
+
+
+1. Vercel 계정 생성/로그인
+  - https://vercel.com 접속
+  - GitHub 계정으로 로그인
+2. 새 프로젝트 생성
+  - "New Project" 클릭
+  - GitHub repository 연결
+  - [project] 저장소 선택
+3. 프로젝트 설정
+  - Framework Preset: Next.js
+  - Root Directory: ./
+  - Build Command: yarn build
+  - Output Directory: .next (자동 감지)
+  - Install Command: yarn install
+
+4. 환경변수 설정
+  - "Environment Variables" 섹션에서 다음 추가:
+
+● 환경변수 설정 (Vercel 대시보드):
+NEXT_PUBLIC_SUPABASE_URL = [YOUR_SUPABASE_PROJECT_URL]
+NEXT_PUBLIC_SUPABASE_ANON_KEY = [YOUR_SUPABASE_ANON_KEY]
+
+5. 배포 실행
+  - "Deploy" 버튼 클릭
+  - 자동 빌드 및 배포 진행
