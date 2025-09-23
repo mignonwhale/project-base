@@ -44,8 +44,18 @@ Preferences > Languages & Frameworks > Node.js에서 Package Manager 항목을 y
 ```
 
 ## shadcn 사용 시
-```
-yarn add -D shadcn-ui
+```bash
+# CLI 설치 (개발 의존성, 배포 안함)
+yarn add -D shadcn-ui 
+
+# 초기화 → components.json 생성
+yarn shadcn init 
+
+# 원하는 UI 컴포넌트를 가져와서 components/ 폴더에 추가
+yarn shadcn add button 
+
+## Usage Error: Couldn't find a script named "shadcn". 에러가 나는 경우 아래 명령어로 
+yarn dlx shadcn@latest add button
 ```
 
 
