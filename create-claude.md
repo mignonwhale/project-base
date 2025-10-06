@@ -9,8 +9,11 @@ npm install -g @anthropic-ai/claude-code
 3. 터미널 세팅
 - 줄바꿈
 ```
-/terminal-setup
+/terminal-setup # 이건 맥만
 ```
+
+#### 윈도우 터미널에서 멀티라인 프롤프트
+- `\` + enter
 
 
 # CLAUDE.md 예시
@@ -32,7 +35,7 @@ npm install -g @anthropic-ai/claude-code
 - 타입 안정성: TypeScript 엄격 모드 준수
 - 테스트 우선: 테스트 커버리지 90% 이상 유지
 - 컴포넌트 네이밍: PascalCase, 기능을 명확히 나타내는 이름 사용
-- React import: React 타입 사용 시 named import 사용 (`import {type ReactNode, type FC} from 'react';`)
+
 
 ### 2. 패캐지 버전 호환성
 - React 19.1.1 고정(resolutions 설정됨)

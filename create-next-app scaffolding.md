@@ -123,7 +123,18 @@ export default function Home() {
 ```
 
 ### .gitignore 추가
-- `.gitignore`파일 하단에 `.idea` 추가한다.
+- `.gitignore`파일 하단에 아래 내용 추가한다. 
+
+```
+# IDE
+.idea/
+
+# 개발용
+CLAUDE.md
+.claude/
+*.md.bak
+docs/
+```
 
 ### troubleshootin.md 작성
 - 실행 시 오류가 발생한 내용, 원인, 해결책을 정리하여 `/docs/troubleshooting.md` 파일로 작성한다.
